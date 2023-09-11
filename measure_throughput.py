@@ -1,30 +1,59 @@
 import logging
 import threading
+import socket
 from scapy.all import sniff
 
 # Initialize logging
 logging.basicConfig(filename='metrics.txt', level=logging.INFO)
 
 # Initialize global variables
-packets_per_second = 0
-bits_per_second = 0
-bytes_per_minute = 0
+in_packets_per_second = 0
+out_packets_per_second = 0
+in_bits_per_second = 0
+out_bits_per_second = 0
+in_bytes_per_minute = 0
+out_bytes_per_minute = 0
+
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+local_ip = s.getsockname()[0]
+s.close()
 
 def packet_callback(pkt):
-    global packets_per_second, bits_per_second, bytes_per_minute
-    packets_per_second += 1
-    bits_per_second += len(pkt) * 8
-    bytes_per_minute += len(pkt)
+    global in_packets_per_second, out_packets_per_second
+    global in_bits_per_second, out_bits_per_second
+    global in_bytes_per_minute, out_bytes_per_minute
+
+    if 'IP' in pkt:
+        if pkt['IP'].src == local_ip:
+            out_packets_per_second += 1
+            out_bits_per_second += len(pkt) * 8
+            out_bytes_per_minute += len(pkt)
+        elif pkt['IP'].dst == local_ip:
+            in_packets_per_second += 1
+            in_bits_per_second += len(pkt) * 8
+            in_bytes_per_minute += len(pkt)
 
 def report_metrics():
-    global packets_per_second, bits_per_second, bytes_per_minute
+    global in_packets_per_second, out_packets_per_second
+    global in_bits_per_second, out_bits_per_second
+    global in_bytes_per_minute, out_bytes_per_minute
+
     while True:
-        log_data = f"Packets/s: {packets_per_second}, Bits/s: {bits_per_second}, Bytes/min: {bytes_per_minute}"
+        log_data = f"Inbound - Packets/s: {in_packets_per_second}, Bits/s: {in_bits_per_second}, Bytes/min: {in_bytes_per_minute} | " \
+                   f"Outbound - Packets/s: {out_packets_per_second}, Bits/s: {out_bits_per_second}, Bytes/min: {out_bytes_per_minute}"
+        
         print(log_data)
         logging.info(log_data)
-        packets_per_second = 0
-        bits_per_second = 0
-        bytes_per_minute = 0
+        
+        # Reset counters
+        in_packets_per_second = 0
+        out_packets_per_second = 0
+        in_bits_per_second = 0
+        out_bits_per_second = 0
+        in_bytes_per_minute = 0
+        out_bytes_per_minute = 0
+
         threading.Event().wait(2)
 
 if __name__ == "__main__":
@@ -40,6 +69,48 @@ if __name__ == "__main__":
         logging.info("Stopping packet capture.")
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
