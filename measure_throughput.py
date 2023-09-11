@@ -1,3 +1,4 @@
+import time
 import logging
 import threading
 import socket
@@ -47,6 +48,10 @@ if args.csv:
     csv_writer.writerow(['Time', 'Inbound Packets/s', 'Inbound Bits/s', 'Inbound Bytes/min', 'Outbound Packets/s', 'Outbound Bits/s', 'Outbound Bytes/min'])
 
 def report_metrics():
+    global in_packets_per_second, out_packets_per_second
+    global in_bits_per_second, out_bits_per_second
+    global in_bytes_per_minute, out_bytes_per_minute
+    global csv_writer
     global csv_writer
     start_time = time.time()
 
@@ -54,14 +59,33 @@ def report_metrics():
         elapsed_time = time.time() - start_time
         if elapsed_time > args.time:
             break
+
         log_data = [elapsed_time, in_packets_per_second, in_bits_per_second, in_bytes_per_minute, out_packets_per_second, out_bits_per_second, out_bytes_per_minute]
         
+        # CSV Writing
         if csv_writer:
             csv_writer.writerow(log_data)
+            csv_file.flush()
 
-        if csv_file:
-            csv_file.close()
+        # Logging and Printing
+        log_str = f"Inbound - Packets/s: {in_packets_per_second}, Bits/s: {in_bits_per_second}, Bytes/min: {in_bytes_per_minute} | " \
+                  f"Outbound - Packets/s: {out_packets_per_second}, Bits/s: {out_bits_per_second}, Bytes/min: {out_bytes_per_minute}"
 
+        print(log_str)
+        logging.info(log_str)
+
+        # Reset counters
+        in_packets_per_second = 0
+        out_packets_per_second = 0
+        in_bits_per_second = 0
+        out_bits_per_second = 0
+        in_bytes_per_minute = 0
+        out_bytes_per_minute = 0
+
+        threading.Event().wait(2)
+
+    if csv_file:
+        csv_file.close()
 
 def packet_callback(pkt):
     global in_packets_per_second, out_packets_per_second
@@ -86,27 +110,6 @@ def packet_callback(pkt):
             in_bits_per_second += len(pkt) * 8
             in_bytes_per_minute += len(pkt)
 
-def report_metrics():
-    global in_packets_per_second, out_packets_per_second
-    global in_bits_per_second, out_bits_per_second
-    global in_bytes_per_minute, out_bytes_per_minute
-
-    while True:
-        log_data = f"Inbound - Packets/s: {in_packets_per_second}, Bits/s: {in_bits_per_second}, Bytes/min: {in_bytes_per_minute} | " \
-                   f"Outbound - Packets/s: {out_packets_per_second}, Bits/s: {out_bits_per_second}, Bytes/min: {out_bytes_per_minute}"
-        
-        print(log_data)
-        logging.info(log_data)
-        
-        # Reset counters
-        in_packets_per_second = 0
-        out_packets_per_second = 0
-        in_bits_per_second = 0
-        out_bits_per_second = 0
-        in_bytes_per_minute = 0
-        out_bytes_per_minute = 0
-
-        threading.Event().wait(2)
 if __name__ == "__main__":
     try:
         report_thread = threading.Thread(target=report_metrics)
